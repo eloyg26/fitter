@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Dumbbell, House, Moon, Sun, TrendingUp, Utensils } from 'lucide-react';
-import { todayRoutine } from './lib';
+import React, { useEffect, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Dumbbell, House, Moon, Sun, TrendingUp, Utensils } from 'lucide-react';
+import { iso, todayRoutine } from './lib';
 import { muted } from './ui';
 import { useGym } from './store';
 import { Diet, Home, Progress, Workout } from './screens';
@@ -14,20 +14,63 @@ export default function App() {
   const { routines } = useGym();
   const [routine, setRoutine] = useState(() => todayRoutine(routines));
   const [dark, setDark] = useState(() => localStorage.getItem('gym-theme') !== 'light');
+  
+  // Estado para controlar el día actual (0 = hoy, -1 = ayer, 1 = mañana, etc.)
+  const [dateOffset, setDateOffset] = useState(0);
+  
+  // Referencias para el gesto de deslizar (swipe)
+  const touchStartX = useRef(null);
+  const touchEndX = useRef(null);
+
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
     localStorage.setItem('gym-theme', dark ? 'dark' : 'light');
   }, [dark]);
+
   const go = (next, r) => { if (r) setRoutine(r); setTab(next); };
   const Screen = screens[tab];
   const active = routines[routine] ? routine : Object.keys(routines)[0];
-  const today = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }).format(new Date());
+
+  // Cálculo de la fecha activa
+  const baseDate = new Date();
+  baseDate.setDate(baseDate.getDate() + dateOffset);
+  const activeDate = iso(baseDate);
+  
+  // Formateo del título del día
+  let dayLabel = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }).format(baseDate);
+  if (dateOffset === 0) dayLabel = 'Hoy, ' + dayLabel;
+  else if (dateOffset === -1) dayLabel = 'Ayer, ' + dayLabel;
+  else if (dateOffset === 1) dayLabel = 'Mañana, ' + dayLabel;
+
+  // Gestos táctiles
+  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchMove = (e) => { touchEndX.current = e.touches[0].clientX; };
+  const handleTouchEnd = () => {
+    if (touchStartX.current === null || touchEndX.current === null) return;
+    const diff = touchStartX.current - touchEndX.current;
+    if (diff > 50) setDateOffset((o) => o + 1); // Deslizar izquierda -> Día siguiente
+    if (diff < -50) setDateOffset((o) => o - 1); // Deslizar derecha -> Día anterior
+    touchStartX.current = null;
+    touchEndX.current = null;
+  };
 
   return (
-    <div className="min-h-screen bg-zinc-50 font-sans text-zinc-950 transition-colors dark:bg-black dark:text-white">
+    <div 
+      className="min-h-screen overflow-x-hidden bg-zinc-50 font-sans text-zinc-950 transition-colors dark:bg-black dark:text-white"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       <main className="mx-auto max-w-md px-5 pb-12 pt-8">
-        <p className={`text-sm font-medium ${muted}`}>Tu resumen de entrenos</p>
-        <h1 className="mt-1 text-3xl font-extrabold capitalize tracking-tight">{today}</h1>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className={`text-sm font-medium ${muted}`}>{dateOffset === 0 ? 'Tu resumen de entrenos' : 'Historial de actividad'}</p>
+            <div className="mt-1 flex items-center gap-2">
+              <h1 className="min-w-[180px] text-center text-2xl font-extrabold capitalize tracking-tight">{dayLabel}</h1>
+            </div>
+          </div>
+        </div>
+        
         <nav aria-label="Secciones" className="mt-5 flex items-center justify-between rounded-full bg-white p-1 shadow-[0_4px_20px_rgba(0,0,0,0.14)] dark:bg-zinc-900 dark:shadow-[0_4px_20px_rgba(0,0,0,0.6)]">
           <button type="button" onClick={() => setDark((d) => !d)} aria-label={dark ? 'Activar modo claro' : 'Activar modo oscuro'} className={`${btn} size-10`}>
             {dark ? <Moon size={18} /> : <Sun size={18} />}
@@ -46,7 +89,8 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="mt-5"><Screen go={go} routine={active} /></div>
+        {/* Pasamos la fecha activa a las pantallas */}
+        <div className="mt-5"><Screen go={go} routine={active} activeDate={activeDate} /></div>
       </main>
     </div>
   );
