@@ -299,6 +299,7 @@ export function Progress() {
 
 const macros = [['Proteína', 'p', 'bg-violet-500'], ['Carbohidratos', 'c', 'bg-emerald-500'], ['Grasas', 'g', 'bg-sky-500']];
 const blank = { type: 'Desayuno', name: '', kcal: '', p: '', c: '', g: '' };
+const blankRecipe = { ...blank, desc: '' };
 
 export function Diet({ activeDate }) {
   const { meals, goals, recipes = [], addMeal, deleteMeal, saveGoals, saveRecipes, activeProfileId } = useGym();
@@ -310,7 +311,7 @@ export function Diet({ activeDate }) {
   useEffect(() => setG(myGoals), [activeProfileId, goals]);
 
   const [editingRecipes, setEditingRecipes] = useState(false);
-  const [recipeForm, setRecipeForm] = useState({ id: '', ...blank });
+  const [recipeForm, setRecipeForm] = useState({ id: '', ...blankRecipe });
   
   const currentDate = activeDate || iso();
   const list = meals.filter((m) => (!m.profileId || m.profileId === activeProfileId) && m.date === currentDate);
@@ -342,6 +343,7 @@ export function Diet({ activeDate }) {
       id: recipeForm.id || crypto.randomUUID(),
       type: recipeForm.type,
       name: recipeForm.name.trim(),
+      desc: recipeForm.desc?.trim() || '',
       kcal: Number(recipeForm.kcal),
       p: Number(recipeForm.p) || 0,
       c: Number(recipeForm.c) || 0,
@@ -349,11 +351,11 @@ export function Diet({ activeDate }) {
     };
     if (recipeForm.id) saveRecipes(recipes.map(r => r.id === recipeForm.id ? newR : r));
     else saveRecipes([...recipes, newR]);
-    setRecipeForm({ id: '', ...blank, type: recipeForm.type });
+    setRecipeForm({ id: '', ...blankRecipe, type: recipeForm.type });
   };
 
   const deleteRecipe = (id) => saveRecipes(recipes.filter(r => r.id !== id));
-  const editRecipe = (r) => setRecipeForm({ ...r });
+  const editRecipe = (r) => setRecipeForm({ ...r, desc: r.desc || '' });
   
   return (
     <div className="space-y-3">
@@ -398,7 +400,7 @@ export function Diet({ activeDate }) {
       <Card>
         <div className="flex items-center justify-between font-bold">
           <p>{editingRecipes ? 'Gestionar recetas (Global)' : 'Añadir comida'}</p>
-          <button type="button" onClick={() => { setEditingRecipes(!editingRecipes); setRecipeForm({ id: '', ...blank }); }} aria-label="Gestionar recetas" className="flex size-8 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800">
+          <button type="button" onClick={() => { setEditingRecipes(!editingRecipes); setRecipeForm({ id: '', ...blankRecipe }); }} aria-label="Gestionar recetas" className="flex size-8 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800">
             {editingRecipes ? <X size={16} /> : <Pencil size={16} />}
           </button>
         </div>
@@ -411,13 +413,14 @@ export function Diet({ activeDate }) {
                 <select aria-label="Tipo" value={recipeForm.type} onChange={setR('type')} className={`${field} shrink-0`}>{['Desayuno', 'Comida', 'Merienda', 'Cena'].map((t) => <option key={t}>{t}</option>)}</select>
                 <input aria-label="Nombre" placeholder="Nombre" value={recipeForm.name} onChange={setR('name')} className={`${field} w-full min-w-0 bg-white dark:bg-zinc-900`} />
               </div>
+              <input aria-label="Descripción" placeholder="Descripción breve (opcional)" value={recipeForm.desc} onChange={setR('desc')} className={`${field} w-full bg-white dark:bg-zinc-900`} />
               <div className="grid grid-cols-4 gap-2">
                 {[['kcal', 'kcal'], ['p', 'Prot.'], ['c', 'Carb.'], ['g', 'Grasa']].map(([k, label]) => (
                   <input key={k} inputMode="decimal" aria-label={label} placeholder={label} value={recipeForm[k]} onChange={setR(k)} className={`${field} w-full min-w-0 bg-white px-2 text-center dark:bg-zinc-900`} />
                 ))}
               </div>
               <div className="flex gap-2">
-                {recipeForm.id && <button type="button" onClick={() => setRecipeForm({ id: '', ...blank })} className="h-11 w-full rounded-2xl bg-slate-200 font-bold text-slate-700 dark:bg-zinc-700 dark:text-slate-200">Cancelar</button>}
+                {recipeForm.id && <button type="button" onClick={() => setRecipeForm({ id: '', ...blankRecipe })} className="h-11 w-full rounded-2xl bg-slate-200 font-bold text-slate-700 dark:bg-zinc-700 dark:text-slate-200">Cancelar</button>}
                 <button type="submit" className={`${primary} !h-11 ${!recipeForm.id ? 'w-full' : ''}`}>{recipeForm.id ? 'Guardar' : 'Crear receta'}</button>
               </div>
             </form>
@@ -426,8 +429,12 @@ export function Diet({ activeDate }) {
               {recipes.length === 0 && <p className={`text-sm ${muted}`}>No hay recetas guardadas.</p>}
               {recipes.map(r => (
                 <div key={r.id} className="flex items-center justify-between rounded-2xl border border-slate-100 px-3 py-2 dark:border-zinc-800">
-                  <div className="min-w-0"><p className="truncate text-sm font-bold">{r.name}</p><p className={`text-xs ${muted}`}>{r.kcal} kcal · {r.p}g P</p></div>
-                  <div className="flex shrink-0 gap-1">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold">{r.name}</p>
+                    {r.desc && <p className={`truncate text-xs ${muted} mb-1`}>{r.desc}</p>}
+                    <p className={`text-xs font-semibold text-emerald-600 dark:text-emerald-400`}>{r.kcal} kcal · {r.p}g P</p>
+                  </div>
+                  <div className="flex shrink-0 gap-1 pl-2">
                     <button type="button" onClick={() => editRecipe(r)} className="p-2 text-slate-400 hover:text-emerald-600"><Pencil size={15} /></button>
                     <button type="button" onClick={() => deleteRecipe(r.id)} className="p-2 text-slate-400 hover:text-rose-600"><Trash2 size={15} /></button>
                   </div>
@@ -446,10 +453,11 @@ export function Diet({ activeDate }) {
                       key={r.id} 
                       type="button" 
                       onClick={() => loadRecipe(r)}
-                      className="shrink-0 snap-start rounded-2xl bg-emerald-50 px-3 py-2 text-left transition-colors hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20"
+                      className="shrink-0 snap-start rounded-2xl bg-emerald-50 px-3 py-2 text-left transition-colors hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 max-w-[200px]"
                     >
-                      <p className="text-sm font-bold text-emerald-900 dark:text-emerald-100">{r.name}</p>
-                      <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">{r.kcal} kcal · {r.p}g P</p>
+                      <p className="truncate text-sm font-bold text-emerald-900 dark:text-emerald-100">{r.name}</p>
+                      {r.desc && <p className="truncate text-xs text-emerald-700/70 dark:text-emerald-400/70">{r.desc}</p>}
+                      <p className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">{r.kcal} kcal · {r.p}g P</p>
                     </button>
                   ))}
                 </div>
