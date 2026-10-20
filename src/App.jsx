@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Dumbbell, House, Moon, Sun, TrendingUp, Utensils } from 'lucide-react';
+import { Dumbbell, House, Moon, Plus, Sun, TrendingUp, Utensils, X } from 'lucide-react';
 import { iso, todayRoutine } from './lib';
-import { muted } from './ui';
+import { field, muted } from './ui';
 import { useGym } from './store';
 import { Diet, Home, Progress, Workout } from './screens';
 
@@ -11,7 +11,10 @@ const btn = 'flex h-10 items-center justify-center rounded-full text-slate-800 t
 
 export default function App() {
   const [tab, setTab] = useState('inicio');
-  const { routines } = useGym();
+  const { routines, profiles, activeProfileId, setActiveProfile, addProfile } = useGym();
+  const [adding, setAdding] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [profileError, setProfileError] = useState('');
   const [routine, setRoutine] = useState(() => todayRoutine(routines));
   const [dark, setDark] = useState(() => localStorage.getItem('gym-theme') !== 'light');
   
@@ -26,6 +29,15 @@ export default function App() {
     document.documentElement.classList.toggle('dark', dark);
     localStorage.setItem('gym-theme', dark ? 'dark' : 'light');
   }, [dark]);
+
+  const submitProfile = (event) => {
+    event.preventDefault();
+    const name = profileName.trim();
+    if (!name) { setProfileError('Escribe un nombre para el perfil.'); return; }
+    if (profiles.some((p) => p.name.toLowerCase() === name.toLowerCase())) { setProfileError('Ya existe un perfil con ese nombre.'); return; }
+    addProfile(name);
+    setAdding(false);
+  };
 
   const go = (next, r) => { if (r) setRoutine(r); setTab(next); };
   const Screen = screens[tab];
@@ -43,15 +55,19 @@ export default function App() {
   else if (dateOffset === 1) dayLabel = 'Mañana, ' + dayLabel;
 
   // Gestos táctiles
-  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchStart = (e) => {
+    touchEndX.current = null;
+    touchStartX.current = e.target.closest?.('[role="dialog"]') ? null : e.touches[0].clientX;
+  };
   const handleTouchMove = (e) => { touchEndX.current = e.touches[0].clientX; };
   const handleTouchEnd = () => {
-    if (touchStartX.current === null || touchEndX.current === null) return;
-    const diff = touchStartX.current - touchEndX.current;
-    if (diff > 50) setDateOffset((o) => o + 1); // Deslizar izquierda -> Día siguiente
-    if (diff < -50) setDateOffset((o) => o - 1); // Deslizar derecha -> Día anterior
+    const start = touchStartX.current, end = touchEndX.current;
     touchStartX.current = null;
     touchEndX.current = null;
+    if (start === null || end === null) return;
+    const diff = start - end;
+    if (diff > 50) setDateOffset((o) => o + 1); // Deslizar izquierda -> Día siguiente
+    if (diff < -50) setDateOffset((o) => o - 1); // Deslizar derecha -> Día anterior
   };
 
   return (
@@ -71,7 +87,7 @@ export default function App() {
           </div>
         </div>
         
-        <nav aria-label="Secciones" className="mt-5 flex items-center justify-between rounded-full bg-white p-1 shadow-[0_4px_20px_rgba(0,0,0,0.14)] dark:bg-zinc-900 dark:shadow-[0_4px_20px_rgba(0,0,0,0.6)]">
+        <nav aria-label="Secciones" className="mt-5 flex items-center gap-0.5 rounded-full bg-white p-1 shadow-[0_4px_20px_rgba(0,0,0,0.14)] dark:bg-zinc-900 dark:shadow-[0_4px_20px_rgba(0,0,0,0.6)]">
           <button type="button" onClick={() => setDark((d) => !d)} aria-label={dark ? 'Activar modo claro' : 'Activar modo oscuro'} className={`${btn} size-10`}>
             {dark ? <Moon size={18} /> : <Sun size={18} />}
           </button>
@@ -82,16 +98,41 @@ export default function App() {
               onClick={() => setTab(key)}
               aria-label={label}
               aria-current={tab === key ? 'page' : undefined}
-              className={`${btn} ${tab === key ? 'gap-2 bg-zinc-950 px-4 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-slate-200' : 'size-10'}`}
+              className={`${btn} ${tab === key ? 'bg-zinc-950 px-3 text-white sm:gap-2 sm:px-4 hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-slate-200' : 'size-10'}`}
             >
               <Icon size={18} />
-              {tab === key && <span className="text-sm font-semibold">{label}</span>}
+              {tab === key && <span className="hidden text-sm font-semibold sm:inline">{label}</span>}
             </button>
           ))}
+          <label htmlFor="active-profile" className="sr-only">Perfil activo</label>
+          <select id="active-profile" value={activeProfileId} onChange={(e) => setActiveProfile(e.target.value)} className="h-10 min-w-0 flex-1 rounded-full bg-transparent px-2 text-sm font-medium outline-none focus:ring-2 focus:ring-slate-400 dark:text-slate-200">
+            {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <button type="button" onClick={() => { setProfileName(''); setProfileError(''); setAdding(true); }} aria-label="Añadir perfil" title="Añadir perfil" className={`${btn} size-10 shrink-0`}><Plus size={18} /></button>
         </nav>
         {/* Pasamos la fecha activa a las pantallas */}
         <div className="mt-5"><Screen go={go} routine={active} activeDate={activeDate} /></div>
       </main>
+      {adding && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-[2px]" onMouseDown={(e) => { if (e.target === e.currentTarget) setAdding(false); }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="new-profile-title" className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+            <button type="button" onClick={() => setAdding(false)} aria-label="Cerrar" className="absolute right-4 top-4 inline-flex size-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-zinc-800"><X size={17} /></button>
+            <h2 id="new-profile-title" className="text-lg font-semibold">Crear perfil</h2>
+            <p className={`mt-1 text-sm ${muted}`}>Cada perfil tiene sus propios entrenos, comidas y objetivos en este dispositivo. No hay sincronización ni contraseña.</p>
+            <form onSubmit={submitProfile} className="mt-5 space-y-4">
+              <div>
+                <label htmlFor="profile-name" className="mb-1.5 block text-sm font-medium">Nombre</label>
+                <input id="profile-name" value={profileName} onChange={(e) => setProfileName(e.target.value)} maxLength={40} autoFocus required placeholder="Ej. Eloy" className={`${field} w-full`} />
+              </div>
+              {profileError && <p role="alert" className="rounded-2xl bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{profileError}</p>}
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setAdding(false)} className="h-11 rounded-full bg-slate-100 px-5 text-sm font-semibold dark:bg-zinc-800">Cancelar</button>
+                <button type="submit" className="h-11 rounded-full bg-emerald-700 px-5 text-sm font-bold text-white hover:bg-emerald-800">Crear perfil</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

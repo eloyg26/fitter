@@ -19,6 +19,7 @@ const initial = {
   meals: [],    
   recipes: DEFAULT_RECIPES, 
   goals: { p1: defaultGoals },
+  cravings: {},
 };
 
 export const GymProvider = ({ children }) => {
@@ -56,6 +57,12 @@ export const GymProvider = ({ children }) => {
     saveRoutines: (routines) => setData((d) => ({ ...d, routines })),
     saveGoals: (goals) => setData((d) => ({ ...d, goals: { ...d.goals, [d.activeProfileId]: { ...(d.goals[d.activeProfileId] || defaultGoals), ...goals } } })),
     saveRecipes: (recipes) => setData((d) => ({ ...d, recipes })),
+    // Lo que le apetece comer a un perfil cada día: { [perfil]: { [fecha]: texto } }
+    saveCraving: (date, text) => setData((d) => {
+      const mine = { ...(d.cravings?.[d.activeProfileId] || {}) };
+      if (text.trim()) mine[date] = text.trim(); else delete mine[date];
+      return { ...d, cravings: { ...(d.cravings || {}), [d.activeProfileId]: mine } };
+    }),
   };
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 };

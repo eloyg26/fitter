@@ -302,7 +302,7 @@ const blank = { type: 'Desayuno', name: '', kcal: '', p: '', c: '', g: '' };
 const blankRecipe = { ...blank, desc: '' };
 
 export function Diet({ activeDate }) {
-  const { meals, goals, recipes = [], addMeal, deleteMeal, saveGoals, saveRecipes, activeProfileId } = useGym();
+  const { meals, goals, recipes = [], addMeal, deleteMeal, saveGoals, saveRecipes, activeProfileId, profiles, cravings = {}, saveCraving } = useGym();
   const [f, setF] = useState(blank);
   const [editing, setEditing] = useState(false);
   const myGoals = goals[activeProfileId] || Object.values(goals)[0];
@@ -314,6 +314,14 @@ export function Diet({ activeDate }) {
   const [recipeForm, setRecipeForm] = useState({ id: '', ...blankRecipe });
   
   const currentDate = activeDate || iso();
+  const [craving, setCraving] = useState('');
+  useEffect(() => setCraving(cravings[activeProfileId]?.[currentDate] || ''), [activeProfileId, currentDate, cravings]);
+  const others = profiles.filter((p) => p.id !== activeProfileId && cravings[p.id]?.[currentDate]);
+  const myName = profiles.find((p) => p.id === activeProfileId)?.name;
+  const submitCraving = (event) => {
+    event.preventDefault();
+    saveCraving(currentDate, craving);
+  };
   const list = meals.filter((m) => (!m.profileId || m.profileId === activeProfileId) && m.date === currentDate);
   const tot = list.reduce((t, m) => ({ kcal: t.kcal + m.kcal, p: t.p + m.p, c: t.c + m.c, g: t.g + m.g }), { kcal: 0, p: 0, c: 0, g: 0 });
   const set = (k) => (e) => setF((v) => ({ ...v, [k]: e.target.value }));
@@ -359,6 +367,20 @@ export function Diet({ activeDate }) {
   
   return (
     <div className="space-y-3">
+      <Card>
+        <p className={`text-sm font-medium ${muted}`}>Lo que me apetece comer{myName ? ` · ${myName}` : ''}</p>
+        <form onSubmit={submitCraving} className="mt-3 flex gap-2">
+          <input aria-label="Qué te apetece comer" placeholder="Ej. pollo con arroz" value={craving} maxLength={80} onChange={(e) => setCraving(e.target.value)} className={`${field} w-full min-w-0`} />
+          <button type="submit" aria-label="Guardar lo que me apetece" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-white"><Check size={18} /></button>
+        </form>
+        {others.length > 0 && (
+          <ul className="mt-4 space-y-2">
+            {others.map((p) => (
+              <li key={p.id} className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm dark:bg-emerald-500/10">A <b>{p.name}</b> le apetece {cravings[p.id][currentDate]}</li>
+            ))}
+          </ul>
+        )}
+      </Card>
       <Card>
         <div className={`flex items-center justify-between text-sm font-medium ${muted}`}><span>Calorías del día</span><span className="flex items-center gap-1"><button type="button" onClick={() => { setG(myGoals); setEditing((v) => !v); }} aria-label="Editar objetivo" aria-pressed={editing} className="flex size-8 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800">{editing ? <X size={16} /> : <Pencil size={16} />}</button><Utensils size={18} /></span></div>
         <p className="mt-3 text-3xl font-extrabold tracking-tight">{fmt(tot.kcal)} kcal</p>
